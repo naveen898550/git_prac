@@ -1,0 +1,459 @@
+Configuration Management
+============================
+This is the process of configuring servers from one point
+of control
+
+Advantages
+==================
+1 Provisioning of Servers
+  Setup of s/w's on servers can be done very easily from one point
+
+2 Reduction of usage of resources
+  We require less amount of time,money and human resources to configure
+  servers
+
+3 Handling Snowflake servers
+  After a point of time all servers in the data center behave like
+  snowflake servers ie they might be running on slightly different
+  h/w and s/w confurations.Configuaration Management tools can pick
+  up this info in simple setup file which can be reused to setup
+  similar environments
+
+4 Disaster Recovery
+  In case of disaster recovery where we can loose an entire data center
+  we can recreate similar data center with greater ease
+
+5 Idempotent
+  Configuration Management tools are used to bring the servers to a
+  specific state called as "desired state",If the rmeote server is 
+  already in the desired state CM tools will not reconfigure that server
+
+===========================================================================
+Popular CM tools
+======================
+Ansible
+Chef
+Puppet
+Saltstack
+=========================================================================
+Ansible is installed on one machine that is called as "Controller"
+all the remaining servers that we want to configure are called
+as "managed nodes/hosts"
+Ansible uses "agentless" policy to configure the remote servers
+ie we don't require any client side s/w of ansible to be present
+on the managed nodes
+Ansible uses "push" methodology to push the configuration changes
+via passwordless ssh
+
+=========================================================================
+Setup of Ansible
+=============================
+1 Create 3-4 AWS ubuntu instances
+2 Name the first one Controller and the remaining as MAnaged nodes
+3 Establish passwordless ssh between Controller and managed nodes
+  a) Connect to managed node
+  b) Setup password of ubuntu user
+     sudo passwd ubuntu
+  c) Edit the sshd_config file
+     sudo vim /etc/ssh/sshd_config
+     Search for "PasswordAuthentication" and change it from no to yes
+  d) Restart ssh
+     sudo service ssh restart
+  e) Connect to Controller
+  f) Generate the ssh keys
+     ssh-keygen
+  g) Copy the public keys to authoried_keys on managed nodes
+     ssh-copy-id ubuntu@private_ip_of_managednode
+
+4 Install Ansible
+  a) Update the apt repository
+     sudo apt-get update
+  b) Install softwares required for ansible
+     sudo apt-get install software-properties-common
+  c) Add the latest version of ansible to apt repository
+     sudo apt-add-repository ppa:ansible/ansible
+  d) Update the apt repository
+     sudo apt-get update
+  e) Install ansible
+     sudo apt-get install -y ansible
+
+Ansible uses a files known as "inventory" file to read info about 
+the managed nodes,Here we should add the rmeote managed nodes
+ipaddress
+
+sudo vim /etc/ansible/hosts
+Copy paste the private ip address of all managed nodes
+
+Important Modules in Ansible
+===================================
+1 command
+2 shell
+3 ping
+4 user
+5 copy
+6 fetch
+7 file
+8 apt
+9 yum
+10 git
+11 service
+12 replace
+13 get_url
+14 uri
+15 debug
+16 stat
+17 include
+18 docker_container
+19 docker_image
+20 docker_login
+21 docker_swarm
+======================================================================
+Day 2
+=====================================================================
+=========================================================================
+Ansible perfrom remote configuration on servers in 3 ways
+1 Adhoc commands
+2 Playbooks
+3 Roles
+
+============================================================================
+Adhoc commands
+====================
+Syntax of Adhoc commands
+--------------------------------------
+ansible all/ipaddress/group_name  -i path_of_inventory -m module_name 
+                                                            -a '          ' 
+
+
+Command Module
+==================
+Ansible command to see the memory information of all managed nodes
+ansible all -i /etc/ansible/hosts -m command -a 'free m'
+
+/etc/ansible/hosts is the default inventory file and when using it
+we need not give -i
+ansible all  -m command -a 'free m'
+
+command module is the default module os ansible and we need not  use
+-m option when working on command module
+ansible all   -a 'free m'
+
+====================================================================
+Shell Module
+-----------------
+Ansible commands to downlaod the docker script and execute it to install docker
+ansible all -m shell -a ' curl -fsSL https://get.docker.com -o get-docker.sh'
+
+ansible all -m shell -a 'sh get-docker.sh'
+
+--------------------------------------------------------------------------
+Ansible command to capture memory statics into a file called as file1
+ansible all -m shell -a 'free -m > file1'
+
+=====================================================================
+User Module
+=================
+Ansible command to create a user and assign a password
+ansible all -m user -a 'name=sai password=intelliqit' -b
+
+Ansible command to create a user,assign home dir,default shell
+uid,comment etc
+ ansible all -m user -a 'name=Anu password=intelliqit 
+          home=/home/ubuntu/Anu uid=12345 shell=/bin/bash 
+                                     comment="A normal user"' -b
+
+================================================================================
+Day 3
+================================================================================
+Ansible command to create file on all managed nodes
+ansible all -m file -a 'name=/tmp/file1 state=touch'
+
+state=touch    create files
+state=directory creates directories
+state=absent    delete files/directories
+
+
+
+Ansible command to create file and also specify the owner,group owner
+and permissions
+ansible all -m file -a 'name=/tmp/file1 state=touch owner=sai 
+                                                group=Anu mode=750' -b
+
+
+===========================================================================
+Ansible command to copy /etc/passwd file to all managed nodes
+ ansible all -m copy -a 'src=/etc/passwd dest=/tmp'
+
+Create a chain of directories on the controller and copy all that to
+the managed nodes
+mkdir -p d1/d2/d3/d4/d5
+ansible all -m copy -a 'src=d1 dest=/home/ubuntu'
+
+Copy module can also change the permissions,ownership and group ownership
+of files that are copied
+ansible all -m copy -a 'src=file1 dest=/tmp owner=root 
+                                                  group=sai mode=700' -b
+
+=========================================================================
+Day 3
+======================================================================-===
+apt modules
+=======================
+Ansible command to install git on all managed nodes
+ansible all -m apt -a 'name=git state=present' -b
+
+state=present is for installation
+state=absent is for uninstallation
+state=latest  is for upgrading to a later version
+
+To update the apt repository we can use
+update_cache-yes
+Ansible command to install tomcat9 after updating the apt repository
+ansible all -m apt -a 'name=tomcat9 state=present update_cache=yes' -b
+
+========================================================================
+Service module
+===================
+Ansible command to restart tomcat on all managed nodes
+ ansible all -m service -a 'name=tomcat9 state=restarted' -b
+
+state=restarted is for restarting
+state=stopped is for stopping
+state=started is for starting 
+
+========================================================================
+=========================================================================
+git module
+=================
+Ansible command to download from a remote git repository
+ansible all -m git -a 'repo=https://github.com/intelliqittrainings/maven.git dest=/tmp/mygit' -b
+
+=============================================================================
+get_url
+==============
+Ansible command to download jenkins.war into all managed nodes
+ ansible all -m get_url -a 
+       'url=https://get.jenkins.io/warstable/2.277.2/jenkins.war  dest=/tmp'
+
+
+===============================================================================
+Replace module
+=====================
+Ansible command to change the pot of tomcat from 8080 to 9090
+
+ansible all -m replace -a 'regexp=8080 replace=9090 path=/etc/tomcat9/server.xml' -b
+ansible all -m service -a 'name=tomcat9 state=restarted' -b
+
+
+==============================================================================
+uri module
+====================
+Ansible command to check if google.com is reachable from all managed nodes
+ansible all -m uri -a 'url=http://google.com status_code=200'
+
+------------------------------------------------------------------------------
+Configure apache2 on all managed nodes
+========================
+1 Install apache2 on all managed nodes
+  ansible all -m apt -a 'name=apache2 state=present' -b
+
+2 Edit the index.html file
+  ansible all -m copy -a 'content="Welcome to IntelliqIT"                                                             dest=/var/www/html/index.html' -b
+
+3 Restart apache2
+  ansible all -m service -a 'name=apache2 state=restarted' -b
+
+4 Check the url response of apache2
+  ansible all -m uri -a 'url=http://172.31.28.60 status_code=200'
+  ansible all -m uri -a 'url=http://172.31.23.20 status_code=200'
+
+=======================================================================
+Configuring tomcat9
+==========================
+1 Install tomcat9
+  ansible all -m apt -a 'name=tomcat9 state=present update_cache=yes' -b
+
+2 Copy the tomcat-users.xml file
+  ansible all -m copy -a 'src=tomcat-users.xml dest=/etc/tomcat9' -b
+
+3 Change port of tomcat
+  ansible all -m replace -a 'regexp=9090 replace=8080 
+                                     path=/etc/tomcat9/server.xml' -b
+
+4 Restart tomcat
+  ansible all -m service -a 'name=tomcat9 state=restarted' -b 
+
+5 Check the url reponse of tomcat
+  ansible all -m uri -a 'url=http://172.31.28.60:8080 status_code=200' -b
+  ansible all -m uri -a 'url=http://172.31.23.20:8080 status_code=200' -b
+
+
+
+=======================================================================
+Day 4
+=======================================================================
+======================================================================
+<intelliqit>
+<trainers>
+<devops>Sai</devops>
+<aws>Sheshi</aws>
+   </trainers>
+   <coordinators>
+        <devops>Shalini</devops>
+        <aws>Shahida</aws>
+   </coordinators>
+</intelliqit>
+
+
+---
+intelliqit:
+ trainers:
+  devops:Sai
+  aws: Sheshi
+ coordinators:
+  devops: Shalini
+  aws: Shahida
+...
+============================================================================
+Ansible Playbooks
+========================
+Adhoc commands become difficutl to handle when working on complex
+configurations of s/w applications.
+Each adhoc command can work only on one module and one set of
+arguments.In such cases we can use Ansible playbooks which 
+support greater reusability.
+Playbooks are created using yaml and each playbook is a combination of
+multiple plays.A play contains info about what module has to be 
+executed.These plays are designed to work on a single host or a
+group of hosts or all the hosts
+
+============================================================================
+Anible playbook to create a user on all managed nodes
+
+vim playbook1.yml
+---
+- name: Create user
+  hosts: all
+  tasks:
+   - name: User creation
+     user:
+      name: Hari
+      password: intelliqit
+      uid: 1590
+      home: /home/ubuntu/Hari
+      comment: "A normal user"
+      shell: /bin/bash
+...
+
+To check if the playbook is syntaxtically correct or not
+ansible-playbook playbook1.yml --syntax-check
+
+To execute the playbook
+ansible-playbook playbook1.yml -b
+====================================================================
+Ansible playbook to configure apache2
+vim playbook2.yml
+---
+- name: Configuring apache2
+  hosts: all
+  tasks:
+   - name: Install apache2
+     apt:
+      name: apache2
+      state: present
+      update_cache: yes
+   - name: Edit the index.html file
+     copy:
+      content: "IntelliQIT"
+      dest: /var/www/html/index.html
+   - name: Restart apache2
+     service:
+      name: apache2
+      state: restarted
+   - name: Check the url response of apache2 on server1
+     uri:
+      url: http://172.31.18.115
+      status_code: 200
+   - name: Check the url response of apache2 on server2
+     uri:
+      url: http://172.31.30.86
+      status_code: 200
+...
+
+To run the playbook
+ansible-playbook playbook2.yml -b
+=====================================================================
+Day 5
+======================================================================
+Ansible playbook to configure tomcat9
+- name: Configuring tomcat
+  hosts: all
+  tasks:
+   - name: Install tomcat9
+     apt:
+      name: tomcat9
+      state: present
+      update_cache: yes
+   - name: Copy tomcat-users.xml
+     copy:
+      src: tomcat-users.xml
+      dest: /etc/tomcat9/
+   - name: Change port of tomcat from 8080 to 9090
+     replace:
+      regexp: 8080
+      replace: 9090
+      path: /etc/tomcat9/server.xml
+   - name: Restart tomcat9
+     service:
+      name: tomcat9
+      state: restarted
+   - name: Pause for 3 mins
+     pause:
+      minutes: 3
+   - name: Check tomcat response on server1
+     uri:
+      url: http://172.31.30.86:9090
+      status_code: 200
+   - name: Check tomcat response on server2
+     uri:
+      url: http://172.31.18.115:9090
+      status_code: 200
+...
+
+To execute the playbook
+ansible-playbook playbook3.yml -b
+
+===================================================================
+=======================================================================
+Ansible playbook to copy file from one managed node to another
+vim playbook4.yml
+---
+- name: Fetch file from server1 to controller
+  hosts: 172.31.23.20
+  tasks:
+   - name: Fetch file
+     fetch:
+      src: file2
+      dest: /tmp
+- name: Copy file to server2
+  hosts: 172.31.28.60
+  tasks:
+   - name: Copy file
+     copy:
+      src: /tmp/172.31.23.20/file2
+      dest: /home/ubuntu
+...
+
+========================================================================
+Day 5
+=========================================================================
+
+
+
+
+
+
+
+
+
+
